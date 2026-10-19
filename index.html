@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tieout · agentic reconciliation cockpit</title>
+<meta name="description" content="Watch an agent reconcile a month of books against the bank, live. Change the numbers and it re-reconciles in front of you. A Claude-native tool on synthetic data." />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Ccircle%20cx='16'%20cy='16'%20r='9'%20fill='%23E8604C'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#FBF6EE; --panel:#FFFFFF; --panel-2:#FDF8F1;
+    --ink:#1A1713; --ink-2:#6B5F52; --ink-3:#9E9080;
+    --coral:#E8604C; --coral-deep:#CF4733; --amber:#E8912C; --coral-soft:#FBE7E1; --amber-soft:#FBEFD9;
+    --grad:linear-gradient(90deg,#E8604C,#E8912C);
+    --ok:#1F9D6B; --ok-soft:#E4F2EA; --warn:#C9791E;
+    --line:rgba(26,23,19,.13); --line-2:rgba(26,23,19,.07); --grid:rgba(26,23,19,.04);
+    --sans:'IBM Plex Sans',-apple-system,system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:26px 26px;
+  }
+  .wrap{max-width:1360px;margin:0 auto;padding:0 24px}
+  @media(max-width:600px){.wrap{padding:0 14px}}
+  button{font-family:inherit;cursor:pointer}
+  .mono{font-family:var(--mono)}
+
+  .synthetic{background:var(--ink);color:#F4EADF;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:6px}
+  .synthetic b{color:var(--amber);font-weight:500}
+
+  /* command bar */
+  .bar{position:sticky;top:0;z-index:40;background:rgba(251,246,238,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar .wrap{display:flex;align-items:center;gap:18px;height:62px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;letter-spacing:-.02em}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--grad);box-shadow:0 0 0 4px var(--coral-soft)}
+  .ctx{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);border-left:1px solid var(--line);padding-left:16px;line-height:1.3}
+  .ctx b{color:var(--ink);font-weight:600}
+  .bar .actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:13px;font-weight:500;border-radius:7px;padding:9px 14px;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,transform .12s,background .15s,color .15s}
+  .btn:hover{border-color:var(--coral);color:var(--coral-deep)}
+  .btn:active{transform:translateY(1px)}
+  .btn.go{border:none;color:#fff;background:var(--grad);box-shadow:0 7px 18px -9px rgba(207,71,51,.75)}
+  .btn.go:hover{filter:brightness(1.04);color:#fff}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .dropwrap{position:relative}
+  .menu{position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 20px 50px -20px rgba(120,60,40,.3);min-width:244px;padding:6px;display:none;z-index:50}
+  .menu.open{display:block}
+  .menu button{display:block;width:100%;text-align:left;background:none;border:none;font-size:13px;color:var(--ink);padding:9px 11px;border-radius:7px;line-height:1.35}
+  .menu button:hover{background:var(--coral-soft);color:var(--coral-deep)}
+  .menu button small{display:block;color:var(--ink-3);font-size:11px;margin-top:1px}
+  @media(max-width:820px){.ctx{display:none}}
+  @media(max-width:600px){.bar .wrap{height:auto;min-height:60px;flex-wrap:wrap;gap:8px;padding-top:9px;padding-bottom:9px}.bar .actions{margin-left:0;width:100%;justify-content:flex-start;flex-wrap:wrap}.btn{padding:8px 11px;font-size:12.5px}}
+
+  /* intro strip */
+  .intro{padding:30px 0 14px}
+  .intro h1{font-size:clamp(23px,3vw,34px);font-weight:700;letter-spacing:-.025em;line-height:1.08;max-width:24ch}
+  .intro h1 .em{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .intro p{color:var(--ink-2);max-width:72ch;margin-top:10px;font-size:14.5px}
+  .intro .hint{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:10px}
+  .intro .hint b{color:var(--coral-deep)}
+
+  /* gauges */
+  .gauges{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0 16px}
+  .gauge{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px;position:relative;overflow:hidden}
+  .gauge .v{font-family:var(--mono);font-weight:600;font-size:26px;letter-spacing:-.02em;line-height:1}
+  .gauge .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-top:7px}
+  .gauge.live::after{content:"";position:absolute;left:0;top:0;height:3px;width:100%;background:var(--grad);opacity:0;transition:opacity .3s}
+  .gauge.live.on::after{opacity:1}
+  .gauge.flag .v{color:var(--coral-deep)}
+  @media(max-width:860px){.gauges{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+  /* main deck */
+  .deck{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+  @media(max-width:980px){.deck{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+  .ph{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
+  .ph .t{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+  .ph .meta{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+
+  /* console */
+  .console{height:230px;overflow:auto;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.75;background:
+    linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 21px;}
+  .console .ln{display:flex;gap:9px;white-space:pre-wrap;word-break:break-word}
+  .console .ln .g{color:var(--ink-3);user-select:none;flex:none}
+  .ln.sys .x{color:var(--ink-2)}
+  .ln.ok .x{color:var(--ok)}
+  .ln.warn .x{color:var(--coral-deep)}
+  .ln.ctrl .x{color:var(--warn)}
+  .cursor{display:inline-block;width:8px;height:14px;background:var(--grad);vertical-align:-2px;animation:blink 1s steps(2) infinite;border-radius:1px}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ledgers */
+  .ledgers{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:560px){.ledgers{grid-template-columns:1fr}}
+  .lcol{min-width:0}
+  .lcol:first-child{border-right:1px solid var(--line-2)}
+  @media(max-width:560px){.lcol:first-child{border-right:none;border-bottom:1px solid var(--line-2)}}
+  .lh{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);padding:9px 12px;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;background:var(--panel-2)}
+  .rows{max-height:none}
+  @media(max-width:560px){.rows{max-height:360px;overflow:auto}}
+  .r{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line-2);font-size:12px;position:relative;opacity:.35;transition:opacity .25s,background .25s}
+  .r.seen{opacity:1}
+  .r.matched{opacity:.5}
+  .r.exc{opacity:1;background:var(--coral-soft)}
+  .r.exc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad)}
+  .r .d{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+  .r .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .r .a{font-family:var(--mono);font-size:12px;text-align:right;font-weight:500}
+  .r .a.neg{color:var(--ink-2)} .r .a.pos{color:var(--ok)}
+  .r .a.edit{cursor:text;border-bottom:1px dashed var(--line);padding-bottom:1px}
+  .r .a.edit:hover{border-color:var(--coral);color:var(--coral-deep)}
+  .r input.ae{font-family:var(--mono);font-size:12px;width:90px;text-align:right;border:1px solid var(--coral);border-radius:4px;padding:1px 4px;color:var(--ink)}
+  .lcap{font-family:var(--mono);font-size:10px;color:var(--ink-3);padding:8px 12px;border-top:1px solid var(--line-2);display:flex;justify-content:space-between;background:var(--panel-2)}
+
+  /* breaks + controls */
+  .findrow{display:grid;grid-template-columns:1fr;gap:0}
+  .find{padding:13px 15px;border-bottom:1px solid var(--line-2);opacity:0;transform:translateX(8px);transition:opacity .3s,transform .3s}
+  .find.in{opacity:1;transform:none}
+  .find:last-child{border-bottom:none}
+  .find .top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .tagx{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:5px;font-weight:600}
+  .tagx.b{background:var(--coral-soft);color:var(--coral-deep)}
+  .tagx.c{background:var(--amber-soft);color:var(--warn)}
+  .find .nm{font-weight:600;font-size:13.5px}
+  .find .amt{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+  .find .why{color:var(--ink-2);font-size:12.5px;line-height:1.5}
+  .find .fix{font-size:12px;margin-top:5px;color:var(--ink)}
+  .find .fix b{color:var(--coral-deep)}
+  .empty{padding:26px 16px;text-align:center;color:var(--ink-3);font-size:12.5px;font-family:var(--mono)}
+
+  /* agent analysis */
+  .agent{margin-top:16px}
+  .agentbody{padding:15px;font-size:13.5px;line-height:1.65;color:var(--ink);min-height:60px}
+  .agentbody .seed{color:var(--ink-3);font-family:var(--mono);font-size:12px}
+  .agentbody .note{color:var(--ink-3);font-size:12px;font-family:var(--mono);margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .agentbody .streamed{white-space:pre-wrap}
+
+  footer{padding:28px 0;color:var(--ink-3);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:22px;border-top:1px solid var(--line)}
+  footer .mono{font-family:var(--mono);font-size:11px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.find{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="synthetic">Synthetic demonstration data &nbsp;·&nbsp; <b>no real financial records</b> &nbsp;·&nbsp; a Georg Chimion build</div>
+
+<div class="bar"><div class="wrap">
+  <div class="brand"><span class="dot"></span>Tieout</div>
+  <div class="ctx"><b>Harbor Point Logistics</b><br>cash account 1010 · Sep 2026</div>
+  <div class="actions">
+    <div class="dropwrap">
+      <button class="btn" id="injectBtn">Change the data ▾</button>
+      <div class="menu" id="injectMenu"></div>
+    </div>
+    <button class="btn" id="agentBtn" disabled>▶ Agent analysis</button>
+    <button class="btn go" id="runBtn">↻ Run reconciliation</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <section class="intro">
+    <h1>Watch an agent <span class="em">tie out the books</span>, live.</h1>
+    <p>Tieout reconciles a month of the general ledger against the bank in front of you, matching line by line, surfacing every break with the fix, and flagging the control risks a reviewer would. It does the work. It does not ask you to enter your numbers.</p>
+    <p class="hint">This is not a canned scene. <b>Click any ledger amount and change it</b>, or use "Change the data", then run it again and watch the breaks change.</p>
+  </section>
+
+  <div class="gauges" id="gauges">
+    <div class="gauge live"><div class="v" id="g-matched">0</div><div class="k">Auto-matched</div></div>
+    <div class="gauge live flag"><div class="v" id="g-breaks">0</div><div class="k">Breaks</div></div>
+    <div class="gauge live"><div class="v" id="g-controls">0</div><div class="k">Control risks</div></div>
+    <div class="gauge live"><div class="v" id="g-rate">0%</div><div class="k">Match rate</div></div>
+    <div class="gauge live"><div class="v" id="g-unrec">$0</div><div class="k">Unreconciled</div></div>
+  </div>
+
+  <div class="deck">
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">Ledgers</span><span class="meta" id="ledgermeta"></span></div>
+        <div class="ledgers">
+          <div class="lcol"><div class="lh">Bank statement <span id="bankn"></span></div><div class="rows" id="bank"></div><div class="lcap"><span>First Harbor Bank</span><span id="bankcap"></span></div></div>
+          <div class="lcol"><div class="lh">General ledger <span id="gln"></span></div><div class="rows" id="gl"></div><div class="lcap"><span>editable · click an amount</span><span id="glcap"></span></div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">Agent activity</span><span class="meta" id="constatus">idle</span></div>
+        <div class="console" id="console"></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="ph"><span class="t">Breaks</span><span class="meta" id="breakmeta">0</span></div>
+        <div class="findrow" id="breaks"><div class="empty">Run the reconciliation to surface breaks.</div></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="ph"><span class="t">Control risks</span><span class="meta" id="ctrlmeta">0</span></div>
+        <div class="findrow" id="controls"><div class="empty">Control pass runs after matching.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel agent">
+    <div class="ph"><span class="t">Live agent analysis</span><span class="meta" id="agentmeta">Claude on Max · demo mode</span></div>
+    <div class="agentbody" id="agentbody"><span class="seed">The matching above is real computation running in your browser. For the working-paper narrative, press "Agent analysis" to have Claude reason over the breaks live.</span></div>
+  </div>
+
+  <footer>
+    <span class="mono">Tieout · agentic reconciliation and controls · built with Claude</span>
+    <span class="mono">All figures synthetic. Not financial advice.</span>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script src="recon.js"></script>
+<script>
+(function(){
+  "use strict";
+  var REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  var BASE = window.TIEOUT_DATA;
+  var edits = {};        // glId -> new amount
+  var injected = { bank: [], gl: [] };
+  var running = false, lastR = null;
+
+  var fmt = function(n){ return (n<0?"-$":"$") + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var md = function(d){ return d.slice(5).replace("-","/"); };
+  var sleep = function(ms){ return new Promise(function(r){ setTimeout(r, REDUCED?0:ms); }); };
+  var $ = function(id){ return document.getElementById(id); };
+
+  function currentData(){
+    var d = JSON.parse(JSON.stringify(BASE));
+    d.gl = d.gl.map(function(g){ return edits[g.id]!=null ? Object.assign({}, g, {amount: edits[g.id]}) : g; });
+    d.bank = d.bank.concat(injected.bank);
+    d.gl = d.gl.concat(injected.gl);
+    return d;
+  }
+
+  // ---- render ledgers ----
+  function rowEl(r, side){
+    var pos = r.amount>=0;
+    var el=document.createElement("div"); el.className="r"; el.dataset.id=r.id;
+    var amtCls = (pos?"pos":"neg") + (side==="gl"?" edit":"");
+    el.innerHTML='<span class="d">'+md(r.date)+'</span><span class="p" title="'+(r.memo||"")+'">'+r.party+'</span><span class="a '+amtCls+'" data-id="'+r.id+'">'+fmt(r.amount)+'</span>';
+    if(side==="gl"){
+      var amt = el.querySelector(".a");
+      amt.addEventListener("click", function(){ if(running) return; editAmount(amt, r); });
+    }
+    return el;
+  }
+  function renderLedgers(){
+    var d = currentData();
+    var bw=$("bank"), gw=$("gl"); bw.innerHTML=""; gw.innerHTML="";
+    d.bank.forEach(function(r){ bw.appendChild(rowEl(r,"bank")); });
+    d.gl.forEach(function(r){ gw.appendChild(rowEl(r,"gl")); });
+    $("bankn").textContent=d.bank.length+" lines"; $("gln").textContent=d.gl.length+" lines";
+    var bn=d.bank.reduce(function(s,r){return s+r.amount;},0), gn=d.gl.reduce(function(s,r){return s+r.amount;},0);
+    $("bankcap").textContent="net "+fmt(bn); $("glcap").textContent="net "+fmt(gn);
+    $("ledgermeta").textContent=d.bank.length+" / "+d.gl.length+" lines";
+  }
+  function editAmount(span, r){
+    var cur = r.amount;
+    var inp=document.createElement("input"); inp.className="ae"; inp.value=cur;
+    span.replaceWith(inp); inp.focus(); inp.select();
+    function commit(){
+      var v=parseFloat(inp.value);
+      if(!isNaN(v) && v!==cur){ edits[r.id]=v; }
+      renderLedgers();
+      run();  // re-reconcile live on edit
+    }
+    inp.addEventListener("blur", commit);
+    inp.addEventListener("keydown", function(e){ if(e.key==="Enter"){ inp.blur(); } if(e.key==="Escape"){ renderLedgers(); } });
+  }
+
+  // ---- console ----
+  function clearConsole(){ $("console").innerHTML=""; }
+  function log(text, cls){
+    var c=$("console");
+    var ln=document.createElement("div"); ln.className="ln "+(cls||"sys");
+    ln.innerHTML='<span class="g">'+new Date().toLocaleTimeString("en-US",{hour12:false})+'</span><span class="x">'+text+'</span>';
+    c.appendChild(ln); c.scrollTop=c.scrollHeight;
+  }
+
+  // ---- gauges ----
+  function setGauges(m,b,c,rate,unrec){
+    $("g-matched").textContent=m; $("g-breaks").textContent=b; $("g-controls").textContent=c;
+    $("g-rate").textContent=(rate||0)+"%"; $("g-unrec").textContent=fmt(unrec||0);
+  }
+  function pulse(on){ document.querySelectorAll(".gauge.live").forEach(function(g){ g.classList.toggle("on", on); }); }
+
+  // ---- explanations derived from the real computed values ----
+  function explain(e){
+    var t=e.type, p=(e.gl||e.bank).party, amt;
+    if(t==="amount_mismatch"){ amt=Math.abs(e.diff); return {tag:"transposition", why:"Ledger shows "+fmt(e.gl.amount)+", the bank cleared "+fmt(e.bank.amount)+". A "+fmt(amt)+" transposition.", fix:"Adjust the ledger to the cleared "+fmt(e.bank.amount)+"."}; }
+    if(t==="fx_rounding"){ amt=Math.abs(e.diff); return {tag:"fx rounding", why:"A foreign-currency invoice settled "+fmt(amt)+" off the booked amount. Immaterial.", fix:"Post the "+fmt(amt)+" to FX gain or loss."}; }
+    if(t==="duplicate"){ return {tag:"duplicate", why:p+" posted twice at the bank for "+fmt(e.bank.amount)+", booked once in the ledger.", fix:"Recover the duplicate and post the offsetting debit."}; }
+    if(t==="unbooked_receipt"){ return {tag:"unbooked receipt", why:fmt(e.bank.amount)+" wire from "+p+" hit the bank, never booked. Cash understated.", fix:"Identify the invoice and book the receipt."}; }
+    if(t==="unbooked_fee"){ return {tag:"unbooked fee", why:"Bank service charge of "+fmt(Math.abs(e.bank.amount))+" cleared but was not recorded.", fix:"Post to bank-fees expense."}; }
+    if(t==="deposit_in_transit"){ return {tag:"deposit in transit", why:fmt(e.gl.amount)+" deposit booked at period end, clears next period. Timing only.", fix:"No entry. Confirm it clears in early October."}; }
+    if(t==="outstanding_check"){ return {tag:"outstanding check", why:"Check to "+p+" for "+fmt(Math.abs(e.gl.amount))+" issued, not yet cleared. Timing only.", fix:"No entry. Monitor for staleness."}; }
+    return {tag:t.replace(/_/g," "), why:"Unmatched item.", fix:"Review."};
+  }
+  function ctrlExplain(c){
+    if(c.type==="sod_violation") return {nm:"Segregation of duties", why:c.who+" entered and approved the same credit-memo reversal. One person controlled both sides.", fix:"Route for independent approval; review the user's access."};
+    if(c.type==="round_weekend"){ var b=c.bank; return {nm:"Round-dollar weekend payout", why:fmt(Math.abs(b.amount))+" to "+b.party+" on a weekend. Round amount, off-hours, new payee.", fix:"Verify the vendor and authorization before the next run."}; }
+    if(c.type==="structuring") return {nm:"Threshold structuring", why:"Two payments to "+c.party+" just under the "+fmt(c.threshold)+" approval limit.", fix:"Review for a split invoice and proper approval."};
+    return {nm:c.type, why:"Flagged.", fix:"Review."};
+  }
+
+  function findEl(cls, tagCls, tagTxt, nm, amt, why, fix){
+    var el=document.createElement("div"); el.className="find";
+    el.innerHTML='<div class="top"><span class="tagx '+tagCls+'">'+tagTxt+'</span><span class="nm">'+nm+'</span><span class="amt">'+(amt||"")+'</span></div><div class="why">'+why+'</div><div class="fix"><b>Fix:</b> '+fix+'</div>';
+    return el;
+  }
+
+  // ---- the live run ----
+  function orderEvents(R){
+    var evs=[];
+    R.matched.forEach(function(m){ evs.push({k:"m", date:m.gl.date, row:m}); });
+    R.exceptions.forEach(function(e){ var r=e.gl||e.bank; evs.push({k:"b", date:r.date, row:e}); });
+    evs.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.k==="b"?1:-1); });
+    return evs;
+  }
+  function mark(id, cls){ var el=document.querySelector('.r[data-id="'+id+'"]'); if(el){ el.classList.add("seen"); el.classList.add(cls); } }
+
+  async function run(){
+    if(running) return; running=true;
+    $("runBtn").disabled=true; $("agentBtn").disabled=true;
+    document.querySelectorAll(".r").forEach(function(el){ el.classList.remove("seen","matched","exc"); });
+    $("breaks").innerHTML=""; $("controls").innerHTML="";
+    clearConsole(); setGauges(0,0,0,0,0); pulse(true); $("constatus").textContent="running";
+    var d=currentData();
+    var R=window.Tieout.reconcile(d); lastR=R;
+
+    log("initializing reconciliation agent", "sys"); await sleep(260);
+    log("loaded "+d.bank.length+" bank lines, "+d.gl.length+" ledger entries", "sys");
+    log("scope: "+d.company+", "+d.period, "sys"); await sleep(260);
+    log("matching on amount, counterparty and date within 3 days", "sys"); await sleep(200);
+
+    var evs=orderEvents(R), m=0, b=0;
+    for(var i=0;i<evs.length;i++){
+      var ev=evs[i];
+      await sleep(ev.k==="b"?230:38);
+      if(ev.k==="m"){ mark(ev.row.bank.id,"matched"); mark(ev.row.gl.id,"matched"); m++; $("g-matched").textContent=m; }
+      else {
+        var e=ev.row, ex=explain(e), r=e.gl||e.bank;
+        if(e.bank) mark(e.bank.id,"exc"); if(e.gl) mark(e.gl.id,"exc");
+        b++; $("g-breaks").textContent=b;
+        log("break · "+ex.tag+" · "+r.party+" "+fmt(r.amount), "warn");
+        var fe=findEl("", "b", ex.tag, r.party, md(r.date), ex.why, ex.fix);
+        $("breaks").appendChild(fe); requestAnimationFrame(function(x){return function(){x.classList.add("in");};}(fe));
+      }
+      $("g-rate").textContent=Math.round(m/Math.max(d.gl.length,1)*100)+"%";
+    }
+    $("breakmeta").textContent=R.exceptions.length;
+    log("matching complete. running controls pass", "sys"); await sleep(300);
+    for(var j=0;j<R.controls.length;j++){
+      await sleep(200);
+      var c=R.controls[j], ce=ctrlExplain(c);
+      log("control risk · "+ce.nm, "ctrl");
+      var cel=findEl("", "c", "risk", ce.nm, "", ce.why, ce.fix);
+      $("controls").appendChild(cel); requestAnimationFrame(function(x){return function(){x.classList.add("in");};}(cel));
+    }
+    if(R.controls.length===0){ $("controls").innerHTML='<div class="empty">No control risks on this data.</div>'; }
+    if(R.exceptions.length===0){ $("breaks").innerHTML='<div class="empty">Everything ties out. No breaks.</div>'; }
+    $("ctrlmeta").textContent=R.controls.length;
+    $("g-controls").textContent=R.controls.length; $("g-unrec").textContent=fmt(R.totals.unreconciled);
+    if(R.totals.unreconciled!==0) $("gauges").querySelector('.gauge:last-child').classList.add("flag");
+    log("done. "+m+" matched, "+R.exceptions.length+" breaks, "+R.controls.length+" control risks, "+fmt(R.totals.unreconciled)+" unreconciled", "sys");
+    $("constatus").textContent="complete"; pulse(false);
+    running=false; $("runBtn").disabled=false; $("agentBtn").disabled=!DEMO_KEY;
+  }
+
+  // ---- change-the-data menu ----
+  var INJECTS=[
+    { label:"Fix the transposition", sub:"set Dunbar ledger to the cleared 4,210", run:function(){ var g=BASE.gl.find(function(x){return x.party==="Dunbar Office Supply";}); if(g) edits[g.id]=-4210; } },
+    { label:"Add a suspicious vendor payment", sub:"round-dollar, weekend, brand-new payee", run:function(){ var id="INJ"+(injected.gl.length+1); injected.gl.push({id:"G"+id,date:"2026-09-21",amount:-15000,party:"Halcyon Holdings",memo:"Consulting retainer"}); injected.bank.push({id:"B"+id,date:"2026-09-21",amount:-15000,party:"Halcyon Holdings",memo:"Consulting retainer"}); } },
+    { label:"Drop a booked deposit", sub:"remove a ledger entry, create a break", run:function(){ var g=BASE.gl.find(function(x){return x.party==="Trident Shipping";}); if(g) edits[g.id]=0.001; } },
+    { label:"Reset to the original books", sub:"clear every change", run:function(){ edits={}; injected={bank:[],gl:[]}; } }
+  ];
+  function buildMenu(){
+    var m=$("injectMenu"); m.innerHTML="";
+    INJECTS.forEach(function(it){
+      var btn=document.createElement("button");
+      btn.innerHTML=it.label+'<small>'+it.sub+'</small>';
+      btn.addEventListener("click", function(){ it.run(); m.classList.remove("open"); renderLedgers(); run(); });
+      m.appendChild(btn);
+    });
+  }
+  $("injectBtn").addEventListener("click", function(e){ e.stopPropagation(); $("injectMenu").classList.toggle("open"); });
+  document.addEventListener("click", function(){ $("injectMenu").classList.remove("open"); });
+
+  // ---- agent analysis (Claude on Max, demo mode) ----
+  var AGENT_ENDPOINT = "https://api.georg.miami/ops/tieout-reason";
+  var DEMO_KEY = new URLSearchParams(location.search).get("k") || "";
+  function packFindings(R){
+    return {
+      company: BASE.company, period: BASE.period,
+      breaks: R.exceptions.map(function(e){ var r=e.gl||e.bank; return {type:e.type, party:r.party, date:r.date, bank:e.bank?e.bank.amount:null, gl:e.gl?e.gl.amount:null, note:explain(e).why}; }),
+      controls: R.controls.map(function(c){ return {type:c.type, party:(c.type==="structuring"?c.party:(c.gl||c.bank).party), note:ctrlExplain(c).why}; })
+    };
+  }
+  $("agentBtn").addEventListener("click", async function(){
+    if(!lastR) return;
+    var body=$("agentbody"); body.innerHTML='<span class="seed">Asking Claude to reason over '+lastR.exceptions.length+' breaks and '+lastR.controls.length+' control risks<span class="cursor"></span></span>';
+    try{
+      var _url=AGENT_ENDPOINT + (DEMO_KEY ? "?k=" + encodeURIComponent(DEMO_KEY) : "");
+      var resp=await fetch(_url, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(packFindings(lastR))});
+      if(!resp.ok){ throw new Error("status "+resp.status); }
+      body.innerHTML='<div class="streamed"></div>'; var out=body.querySelector(".streamed");
+      var reader=resp.body.getReader(), dec=new TextDecoder(), txt="";
+      while(true){ var ch=await reader.read(); if(ch.done) break; txt+=dec.decode(ch.value,{stream:true}).replace(new RegExp("["+String.fromCharCode(8212,8211)+"]","g")," "); out.textContent=txt; }
+    }catch(err){
+      body.innerHTML='<span class="seed">Live Claude analysis is a demo mode and is not switched on for anonymous visitors right now ('+(err.message||"offline")+').</span><div class="note">The breaks and fixes above are already computed from the real reconciliation. Georg runs the live Claude narrative on his Max plan during a walkthrough.</div>';
+    }
+  });
+
+  // ---- boot ----
+  buildMenu(); renderLedgers();
+  if(document.readyState!=="loading") run(); else document.addEventListener("DOMContentLoaded", run);
+  $("runBtn").addEventListener("click", run);
+  if(DEMO_KEY){ $("agentBtn").removeAttribute("disabled"); var _am=$("agentmeta"); if(_am) _am.textContent="Claude on Max · live"; }
+})();
+</script>
+</body>
+</html>
